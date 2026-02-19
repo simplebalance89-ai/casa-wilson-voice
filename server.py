@@ -96,10 +96,10 @@ async def eleven_tts(text: str) -> str:
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.75,
-            "similarity_boost": 0.9,
-            "style": 0.2,
-            "speed": 1.05
+            "stability": 0.65,
+            "similarity_boost": 0.85,
+            "style": 0.3,
+            "speed": 1.15
         }
     }
     async with httpx.AsyncClient() as client:
