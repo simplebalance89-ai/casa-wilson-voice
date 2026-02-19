@@ -1,19 +1,17 @@
 """
 Casa Wilson Voice Agent - Backend
-Browser <-> This Server <-> Azure OpenAI Realtime (text) + ElevenLabs TTS (Uncle Peter's voice)
+Browser <-> This Server <-> Azure OpenAI Realtime API
 """
 import asyncio
 import json
 import os
-import base64
-import httpx
 import websockets
 from dotenv import load_dotenv
-
-load_dotenv()
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -22,10 +20,6 @@ AZURE_ENDPOINT = os.environ.get("AZURE_ENDPOINT", "pwgcerp-9302-resource.openai.
 AZURE_API_KEY = os.environ.get("AZURE_API_KEY", "")
 DEPLOYMENT = os.environ.get("AZURE_DEPLOYMENT", "gpt-4o-realtime")
 API_VERSION = "2025-04-01-preview"
-
-# ElevenLabs Config (Uncle Peter's cloned voice)
-ELEVEN_API_KEY = os.environ.get("ELEVEN_API_KEY", "sk_962a4ca0460880635352e3aa7f23a04492af555a5fe74e99")
-ELEVEN_VOICE_ID = os.environ.get("ELEVEN_VOICE_ID", "7pzUKjYjFInTuktZwpOu")
 
 AZURE_WS_URL = f"wss://{AZURE_ENDPOINT}/openai/realtime?deployment={DEPLOYMENT}&api-version={API_VERSION}"
 
@@ -66,37 +60,6 @@ FAMILY CHARACTERS (weave in naturally):
 VOICE STYLE: Warm, cool, natural. Like a chill uncle. Not over the top. Extra energy only on Ka-chow and Thwip sounds."""
 
 
-async def eleven_tts_stream(text: str, ws: WebSocket):
-    """Stream Uncle Peter's cloned voice via ElevenLabs TTS."""
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVEN_VOICE_ID}/stream"
-    headers = {
-        "xi-api-key": ELEVEN_API_KEY,
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "text": text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {
-            "stability": 0.55,
-            "similarity_boost": 0.75,
-            "speed": 0.9
-        },
-        "output_format": "pcm_24000"
-    }
-
-    async with httpx.AsyncClient() as client:
-        async with client.stream("POST", url, json=payload, headers=headers, timeout=30.0) as response:
-            async for chunk in response.aiter_bytes(chunk_size=4800):
-                if chunk:
-                    b64_audio = base64.b64encode(chunk).decode()
-                    await ws.send_text(json.dumps({
-                        "type": "response.audio.delta",
-                        "delta": b64_audio
-                    }))
-
-    await ws.send_text(json.dumps({"type": "response.audio.done"}))
-
-
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
@@ -112,13 +75,15 @@ async def websocket_endpoint(ws: WebSocket):
         additional_headers={"api-key": AZURE_API_KEY}
     )
 
-    # Configure session - TEXT ONLY output (voice comes from ElevenLabs)
+    # Configure session - full audio mode with ash voice
     session_config = {
         "type": "session.update",
         "session": {
-            "modalities": ["text"],
+            "modalities": ["text", "audio"],
             "instructions": STORY_BUDDY_PROMPT,
+            "voice": "ash",
             "input_audio_format": "pcm16",
+            "output_audio_format": "pcm16",
             "input_audio_transcription": {"model": "whisper-1"},
             "turn_detection": {
                 "type": "server_vad",
@@ -132,9 +97,6 @@ async def websocket_endpoint(ws: WebSocket):
     }
     await azure_ws.send(json.dumps(session_config))
 
-    # Track response text
-    response_text = []
-
     async def forward_to_azure():
         """Forward browser audio to Azure."""
         try:
@@ -147,56 +109,17 @@ async def websocket_endpoint(ws: WebSocket):
             pass
 
     async def forward_to_browser():
-        """Intercept Azure text, convert to Uncle Peter's voice via ElevenLabs."""
-        nonlocal response_text
+        """Forward Azure responses to browser."""
         try:
             while True:
                 msg = await azure_ws.recv()
-                event = json.loads(msg)
-
-                if event["type"] == "response.text.delta":
-                    # Collect text and forward transcript to browser
-                    response_text.append(event.get("delta", ""))
-                    await ws.send_text(json.dumps({
-                        "type": "response.audio_transcript.delta",
-                        "delta": event.get("delta", "")
-                    }))
-
-                elif event["type"] == "response.text.done":
-                    # Full text ready - send to ElevenLabs for Uncle Peter's voice
-                    full_text = "".join(response_text)
-                    response_text = []
-
-                    await ws.send_text(json.dumps({
-                        "type": "response.audio_transcript.done"
-                    }))
-
-                    if full_text.strip():
-                        # Stream Uncle Peter's voice
-                        await eleven_tts_stream(full_text, ws)
-
-                    # Signal response complete
-                    await ws.send_text(json.dumps({
-                        "type": "response.done"
-                    }))
-
-                elif event["type"] in (
-                    "session.created", "session.updated",
-                    "input_audio_buffer.speech_started",
-                    "input_audio_buffer.speech_stopped",
-                    "conversation.item.input_audio_transcription.completed",
-                    "error"
-                ):
-                    # Pass these through to browser as-is
-                    await ws.send_text(msg)
-
-                # Ignore Azure audio events (response.audio.delta etc) - we use ElevenLabs instead
-
+                await ws.send_text(msg)
         except websockets.exceptions.ConnectionClosed:
             pass
-        except Exception as e:
-            print(f"Error in forward_to_browser: {e}")
+        except Exception:
+            pass
 
+    # Run both directions concurrently
     try:
         await asyncio.gather(
             forward_to_azure(),
