@@ -237,12 +237,18 @@
         let isSpeaking = false;
         let audioQueue = [];
         let isPlaying = false;
+        let persistentAudio = null; // Reusable audio element for mobile
 
         const micBtn = document.getElementById('mic-btn');
         const statusEl = document.getElementById('status');
         const transcriptEl = document.getElementById('transcript');
 
         function startSession(kid) {
+            // Unlock audio on mobile - must happen in user gesture
+            persistentAudio = new Audio();
+            persistentAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRBqSAAAAAAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRBqSAAAAAAAAAAAAAAAAAAAA';
+            persistentAudio.play().then(() => { persistentAudio.pause(); }).catch(() => {});
+
             document.getElementById('kid-select-screen').classList.add('hidden');
             document.getElementById('voice-screen').classList.remove('hidden');
 
@@ -489,7 +495,9 @@
             }
             const blob = new Blob([bytes.buffer], { type: 'audio/mp3' });
             const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
+            // Reuse persistent audio element (unlocked on mobile)
+            const audio = persistentAudio || new Audio();
+            audio.src = url;
             audio.onended = () => {
                 isSpeaking = false;
                 micBtn.classList.remove('speaking');
