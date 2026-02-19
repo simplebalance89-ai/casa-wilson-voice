@@ -84,7 +84,7 @@ async def eleven_tts(text: str) -> str:
     headers = {"xi-api-key": ELEVEN_API_KEY, "Content-Type": "application/json"}
     payload = {
         "text": text,
-        "model_id": "eleven_multilingual_v2",
+        "model_id": "eleven_turbo_v2_5",
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.85,
@@ -125,7 +125,7 @@ async def websocket_endpoint(ws: WebSocket):
                 "type": "server_vad",
                 "threshold": 0.7,
                 "prefix_padding_ms": 500,
-                "silence_duration_ms": 4000
+                "silence_duration_ms": 2000
             },
             "temperature": 0.9,
             "max_response_output_tokens": 150
