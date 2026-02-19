@@ -24,7 +24,7 @@ DEPLOYMENT = os.environ.get("AZURE_DEPLOYMENT", "gpt-4o-realtime")
 API_VERSION = "2025-04-01-preview"
 
 # ElevenLabs Config (Uncle Peter's voice - opening only)
-ELEVEN_API_KEY = os.environ.get("ELEVEN_API_KEY", "")
+ELEVEN_API_KEY = os.environ.get("ELEVEN_API_KEY", "sk_962a4ca0460880635352e3aa7f23a04492af555a5fe74e99")
 ELEVEN_VOICE_ID = os.environ.get("ELEVEN_VOICE_ID", "Yg1LMMMKIZnepfULKjaF")
 
 AZURE_WS_URL = f"wss://{AZURE_ENDPOINT}/openai/realtime?deployment={DEPLOYMENT}&api-version={API_VERSION}"
