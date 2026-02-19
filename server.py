@@ -25,7 +25,7 @@ API_VERSION = "2025-04-01-preview"
 
 # ElevenLabs Config (Uncle Peter's voice - opening only)
 ELEVEN_API_KEY = "sk_962a4ca0460880635352e3aa7f23a04492af555a5fe74e99"
-ELEVEN_VOICE_ID = "Yg1LMMMKIZnepfULKjaF"
+ELEVEN_VOICE_ID = "iP95p4xoKVk53GoZ742B"  # Chris - Charming, Down-to-Earth
 
 AZURE_WS_URL = f"wss://{AZURE_ENDPOINT}/openai/realtime?deployment={DEPLOYMENT}&api-version={API_VERSION}"
 
