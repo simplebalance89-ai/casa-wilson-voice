@@ -6,16 +6,20 @@ import asyncio
 import json
 import os
 import base64
+from datetime import datetime, timezone
 import httpx
 import websockets
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 load_dotenv()
 
 app = FastAPI()
+
+# Usage tracking
+sessions_log = []
 
 # Azure OpenAI Config
 AZURE_ENDPOINT = os.environ.get("AZURE_ENDPOINT", "pwgcerp-9302-resource.openai.azure.com")
@@ -114,9 +118,38 @@ async def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/stats")
+async def stats():
+    total = len(sessions_log)
+    active = sum(1 for s in sessions_log if s.get("end") is None)
+    return JSONResponse({
+        "total_sessions": total,
+        "active_now": active,
+        "sessions": [
+            {
+                "started": s["start"],
+                "ended": s.get("end"),
+                "exchanges": s.get("exchanges", 0),
+                "duration_sec": s.get("duration_sec")
+            }
+            for s in sessions_log
+        ]
+    })
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+
+    session = {
+        "start": datetime.now(timezone.utc).isoformat(),
+        "end": None,
+        "exchanges": 0,
+        "duration_sec": None
+    }
+    sessions_log.append(session)
+    start_time = datetime.now(timezone.utc)
+    print(f"[STORYTIME] Session started: {session['start']} | Total sessions: {len(sessions_log)}")
 
     azure_ws = await websockets.connect(
         AZURE_WS_URL,
@@ -173,6 +206,7 @@ async def websocket_endpoint(ws: WebSocket):
                 elif event["type"] == "response.text.done":
                     full_text = "".join(response_text)
                     response_text = []
+                    session["exchanges"] += 1
                     await ws.send_text(json.dumps({"type": "response.audio_transcript.done"}))
 
                     if full_text.strip():
@@ -203,6 +237,10 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         await asyncio.gather(forward_to_azure(), forward_to_browser())
     finally:
+        end_time = datetime.now(timezone.utc)
+        session["end"] = end_time.isoformat()
+        session["duration_sec"] = int((end_time - start_time).total_seconds())
+        print(f"[STORYTIME] Session ended: {session['end']} | Duration: {session['duration_sec']}s | Exchanges: {session['exchanges']}")
         await azure_ws.close()
 
 
