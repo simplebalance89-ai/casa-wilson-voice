@@ -86,12 +86,12 @@ async def eleven_tts(text: str) -> str:
     headers = {"xi-api-key": ELEVEN_API_KEY, "Content-Type": "application/json"}
     payload = {
         "text": text,
-        "model_id": "eleven_multilingual_v2",
+        "model_id": "eleven_turbo_v2_5",
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.85,
             "style": 0.4,
-            "speed": 1.1
+            "speed": 1.05
         }
     }
     async with httpx.AsyncClient() as client:
