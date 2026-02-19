@@ -294,7 +294,7 @@
                     break;
 
                 case 'response.audio.delta':
-                    // Queue audio for playback
+                    // PCM audio (Azure direct) - queue for playback
                     if (!isSpeaking) {
                         isSpeaking = true;
                         micBtn.classList.remove('listening');
@@ -308,6 +308,15 @@
 
                 case 'response.audio.done':
                     // Audio finished
+                    break;
+
+                case 'custom.audio.mp3':
+                    // Uncle Peter's voice as mp3
+                    isSpeaking = true;
+                    micBtn.classList.remove('listening');
+                    micBtn.classList.add('speaking');
+                    statusEl.textContent = 'Uncle Peter is talking...';
+                    playMp3(event.audio);
                     break;
 
                 case 'response.audio_transcript.delta':
@@ -325,7 +334,6 @@
                     break;
 
                 case 'response.done':
-                    // Response complete, mic is already listening
                     setTimeout(() => {
                         isSpeaking = false;
                         micBtn.classList.remove('speaking');
@@ -383,7 +391,7 @@
                 scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
 
                 scriptProcessor.onaudioprocess = (e) => {
-                    if (!isListening || !ws || ws.readyState !== WebSocket.OPEN) return;
+                    if (!isListening || isSpeaking || !ws || ws.readyState !== WebSocket.OPEN) return;
 
                     const inputData = e.inputBuffer.getChannelData(0);
                     // Convert float32 to int16
@@ -470,6 +478,32 @@
             }
 
             playNext();
+        }
+
+        // Play mp3 from base64 (Uncle Peter's voice)
+        function playMp3(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            const blob = new Blob([bytes.buffer], { type: 'audio/mp3' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.onended = () => {
+                isSpeaking = false;
+                micBtn.classList.remove('speaking');
+                if (isListening) {
+                    micBtn.classList.add('listening');
+                    statusEl.textContent = 'Your turn! Just talk.';
+                }
+                URL.revokeObjectURL(url);
+            };
+            audio.play().catch(err => {
+                console.error('Audio play error:', err);
+                isSpeaking = false;
+                micBtn.classList.remove('speaking');
+            });
         }
 
         // Utility functions
